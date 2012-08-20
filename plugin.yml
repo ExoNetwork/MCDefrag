@@ -1,0 +1,71 @@
+author: manf
+database: false
+description: TODO
+main: de.javakara.manf.mcdefrag.MCDefrag
+name: MCDefrag
+startup: postworld
+url: http://forum.team-sod.de
+version: '1.5'
+prefix: Defrag
+commands:
+   defrag:
+      description: This is a demo command.
+      aliases: def
+permissions:
+    defrag.*:
+        default: op
+        description: Gives access to all commands
+        children:
+            defrag.admin.*: true
+            defrag.user.*: true
+    defrag.admin.*:
+        description: Gives access to all Admin commands
+        default: op
+        children:
+            defrag.admin.create: true
+            defrag.admin.delete: true
+            defrag.admin.top.*: true
+    defrag.admin.create:
+        description: Gives access to create a new route
+        default: false
+    defrag.admin.delete:
+        description: Gives access to delete routes
+        default: false
+    defrag.admin.lock:
+        description: Gives access to lock routes
+        default: false
+    defrag.admin.top.*:
+        description: Gives access to all Toplist commands
+        default: op
+        children:
+            defrag.admin.top.clear: true
+            defrag.admin.top.clear.all: true
+    defrag.admin.top.clear:
+        description: Gives access to delete single Stats
+        default: false
+    defrag.admin.top.clear.all:
+        description: Gives access to delete all Stats
+        default: false
+    defrag.user.*:
+        description: Gives access to all User commands
+        default: true
+        children:
+            defrag.user.join: true
+            defrag.user.competitor: true
+            defrag.user.list: true
+            defrag.user.top: true
+    defrag.user.join:
+        description: Gives access to join routes
+        default: false
+    defrag.user.competitor:
+        description: Stats can be saved
+        default: false
+    defrag.user.list:
+        description: user can view list of routes
+        default: false
+    defrag.user.top:
+        description: user can view top list of route
+        default: false
+    defrag.user.reset:
+        description: user can reset his route
+        default: false
