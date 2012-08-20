@@ -28,6 +28,7 @@ public final class Config {
 			List<String> worlds = new ArrayList<String>();
 			worlds.add("world");
 			config.set("worlds", worlds);
+			config.set("default-color", "&6");
 			List<String> colors = new ArrayList<String>();
 			colors.add("&1");colors.add("&2");colors.add("&3");
 			colors.add("&4");colors.add("&5");colors.add("&6");

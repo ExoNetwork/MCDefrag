@@ -308,7 +308,11 @@ public class RegionManager {
 		//test-0+1+2+3+4+5-4000-true-worldname
 		StringBuilder sb = new StringBuilder();
 		for (String[] score: highscores.get(name).getScores()) {
-			sb.append(score[Highscore.type_name] + ";" + score[Highscore.type_score] + "\n");
+			String scorename = score[Highscore.type_name];
+			String scoreamount = score[Highscore.type_score];
+			if(!(scorename.equalsIgnoreCase("") || scoreamount.equalsIgnoreCase("0"))){
+				sb.append(scorename + ";" + scoreamount + "\n");
+			}
 		}
 		out.write(sb.toString());
 		out.close();

@@ -33,7 +33,7 @@ public class MCDefrag extends JavaPlugin{
 		}
 		ShedulerFactory.initialize(this);
 		RegionManager.initialise(getDataFolder());
-		ChatTable.initColors("&6", Config.getStringList("table.colors"));
+		ChatTable.initColors(Config.getString("default-color"), Config.getStringList("table.colors"));
 		PlayerListener.addWorld(Config.getStringList("worlds"));
 		registerCommands();
 		
