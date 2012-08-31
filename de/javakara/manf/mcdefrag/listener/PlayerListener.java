@@ -104,22 +104,25 @@ public class PlayerListener implements Listener {
 		if (!p.hasPermission("defrag.user.join")) {
 			return;
 		}
+		
 		if (PlayerManager.isPlaying(p.getName())) {
 			return;
 		}
+		
 		if (to.getBlock().getTypeId() == 0) {
 			to = to.subtract(0, 1, 0);
 			if (to.getBlock().getTypeId() == 0) {
 				return;
 			}
 		}
+		
 		//p.sendMessage("Block: " + to.getBlock().getTypeId());
 		if (to.getBlock().getTypeId() == 14) {
 			ResponseRegion response = new ResponseRegion();
 			if (RegionManager.areaCheck(world, to.getBlockX(), to.getBlockY(), to.getBlockZ(),response)) {
 				Region r = response.getResponse();
 				String rname = r.getName();
-				if(RegionManager.isBlocked(rname)){
+				if(RegionManager.isRegionBlocked(rname)){
 					p.sendMessage(Language.get("region.blocked"));
 					return;
 				}else{

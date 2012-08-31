@@ -2,6 +2,7 @@ package de.javakara.manf.mcdefrag;
 
 import java.io.IOException;
 
+import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
 import org.bukkit.command.CommandExecutor;
 import org.bukkit.command.CommandSender;
@@ -21,14 +22,31 @@ public class DefragCommands implements CommandExecutor {
 	final String time = "%time%";
 
 	@Override
-	public boolean onCommand(CommandSender sender, Command cmd, String label,
-			String[] args) {
+	public boolean onCommand(CommandSender sender, Command cmd, String label,String[] args) {
+		if(args.length >= 1 && args[0].startsWith("reload")){
+			if (!sender.hasPermission("defrag.admin.reload")) {
+				return permissionsDenied((Player) sender);
+			}
+			if(args[0].endsWith("config")){
+				Config.reload();
+				return true;
+			}else if(args[0].endsWith("language")){
+				Language.reload(MCDefrag.getJarLang());
+				return true;
+			}
+		}
+		
 		if (sender instanceof ConsoleCommandSender) {
-			System.out.println(Language.get("consoleunspported"));
+			System.out.println(Language.get("consoleunspported")[0]);
 			return true;
 		}
 		Player p = (Player) sender;
 		String name = p.getName();
+		
+		if(args.length == 0 || args[0].equalsIgnoreCase("help") || args[0].equalsIgnoreCase("?")){
+			help(p);
+		}
+		
 		if (args.length >= 1) {
 			if (args[0].equalsIgnoreCase("toggle")) {
 				if (p.hasPermission("defrag.admin.create")) {
@@ -131,34 +149,60 @@ public class DefragCommands implements CommandExecutor {
 					return true;
 				}
 			} else if (args[0].equalsIgnoreCase("reset")) {
-				if (PlayerManager.isPlaying(p.getName())) {
+				if (args.length == 1 && PlayerManager.isPlaying(p.getName())) {
 					if (!p.hasPermission("defrag.user.reset")) {
 						return permissionsDenied(p);
 					}
 					RegionManager.removePlayingPlayer(p.getName());
 					p.sendMessage(Language.get("reset.user"));
+					return true;
 				} else {
-					// RESET <name> <id|all>
-					if (args.length == 2 || args[2].equalsIgnoreCase("all")) {
-						if (!p.hasPermission("defrag.admin.top.clear.all")) {
-							return permissionsDenied(p);
-						}
-						RegionManager.resetRoute(args[1]);
-						SpacerReplace sr = new SpacerReplace();
-						sr.addSpacer(track, args[1]);
-						p.sendMessage(getArgumentString("reset.route", sr));
-					}
-					if (args.length >= 3) {
-						if (!is_numeric(args[2])) {
-							p.sendMessage(Language.get("highscore.nonumber"));
+					if(args.length == 1){
+						p.sendMessage(Language.get("reset.notplaying"));
+						return true;
+					}else{
+						Player tar = Bukkit.getPlayer(args[2]);
+						if(tar != null){
+							SpacerReplace sr = new SpacerReplace();
+							sr.addSpacer("%target%", tar.getName());
+							if(PlayerManager.isPlaying(tar.getName())){
+								RegionManager.removePlayingPlayer(tar.getName());
+								p.sendMessage(getArgumentString("reset.adminreset", sr));
+								tar.sendMessage(Language.get("reset.user"));
+								return true;
+							}else{
+								p.sendMessage(getArgumentString("reset.adminnotplaying", sr));
+								return true;
+							}
+						}else{
+							p.sendMessage(Language.get("reset.adminnotfound"));
 							return true;
 						}
 						
-						RegionManager.deleteHighscoreScore(args[1], Integer.valueOf(args[2])-1);
 					}
-
 				}
-			} else if (args[0].equalsIgnoreCase("lock")) {
+			}else if(args[0].equalsIgnoreCase("clearrecords")){
+				// clearrecords <name> <id|all>
+				if (args.length == 2 || args[2].equalsIgnoreCase("all")) {
+					if (!p.hasPermission("defrag.admin.top.clear.all")) {
+						return permissionsDenied(p);
+					}
+					RegionManager.resetRegion(args[1]);
+					SpacerReplace sr = new SpacerReplace();
+					sr.addSpacer(track, args[1]);
+					p.sendMessage(getArgumentString("reset.route", sr));
+				}else if (args.length >= 3) {
+					if(!p.hasPermission("defrag.admin.top.clear")){
+						return permissionsDenied(p);
+					}
+					if (!is_numeric(args[2])) {
+						p.sendMessage(Language.get("highscore.nonumber"));
+						return true;
+					}
+					
+					RegionManager.deleteHighscoreScore(args[1], Integer.valueOf(args[2])-1);
+				}
+			}else if (args[0].equalsIgnoreCase("lock")) {
 				if(!p.hasPermission("defrag.admin.lock")){
 					return permissionsDenied(p);
 				}
@@ -204,6 +248,35 @@ public class DefragCommands implements CommandExecutor {
 		return true;
 	}
 
+	private boolean help(Player p){
+		if(p.hasPermission("defrag.admin.create")){
+			p.sendMessage("toggle");
+			p.sendMessage("create");
+			p.sendMessage("finish");
+			p.sendMessage("time");
+		}
+		if(p.hasPermission("defrag.user.list")){
+			p.sendMessage("list");
+		}
+		if(p.hasPermission("defrag.user.top")){
+			p.sendMessage("top");
+		}
+		if(p.hasPermission("defrag.user.reset")){
+			p.sendMessage("reset");
+		}
+		if(p.hasPermission("defrag.admin.top.clear.all")){
+			p.sendMessage("admin reset all");
+		}
+		if(p.hasPermission("defrag.admin.top.clear")){
+			p.sendMessage("admin reset single");
+		}
+		if(p.hasPermission("defrag.admin.lock")){
+			p.sendMessage("admin lock");
+			p.sendMessage("admin unlock");
+		}
+		return true;
+	}
+	
 	private String[] getArgumentString(String node, SpacerReplace sr) {
 		return MCDefrag.getArgumentString(node, sr);
 	}

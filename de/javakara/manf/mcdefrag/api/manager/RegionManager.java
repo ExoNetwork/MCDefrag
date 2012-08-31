@@ -47,7 +47,7 @@ public class RegionManager {
 		disabledroutes = new HashMap<String, Boolean>();
 	}
 
-	public static void initialise(File dataFolder){
+	public static synchronized void initialise(File dataFolder){
 		regionFile = new File(dataFolder + File.separator + "regions.defragbase");
 		highscoreFolder = new File(dataFolder + File.separator + "scores");
 		try {
@@ -72,35 +72,53 @@ public class RegionManager {
 		}, 20*60*5, 20*60*5);
 	}
 	
-	public static synchronized boolean areaCheck(String worldname, double x, double y, double z, ResponseRegion r) {
-		if (regions.size() == 0) {
-			return false;
-		}
-		for (Region region : regions.get(worldname)) {
-			if (!disabledroutes.get(region.getName())) {
-				if (region.playerIsInStartRegion(x, y, z)) {
-					if (r != null) {
-						r.setResponse(endzone.get(region.getName()));
-					}
-					return true;
-				}
-			}
+	/* Region API */
+	
+	public static synchronized boolean disableRegion(String region) {
+		return setRegion(region, true);
+	}
+
+	public static synchronized boolean enableRegion(String region) {
+		return setRegion(region, false);
+	}
+	
+	public static synchronized boolean isRegionBlocked(String region) {
+		if (blockedroutes.containsKey(region)) {
+			return !blockedroutes.get(region).equals("");
 		}
 		return false;
+	}
+	
+	public static synchronized long getMaxTime(String region) {
+		if (maxtime.containsKey(region)) {
+			return maxtime.get(region);
+		}
+		return 0;
 	}
 
 	public static synchronized void addRegion(String name, Region r) {
 		addRegion(name, r, Config.getLong("default-time")*1000, false,r);
 	}
-
+	
 	public static synchronized void setEndRegion(String region, Region r) {
 		if (endzone.containsKey(region)) {
 			r.setName(region);
 			endzone.put(region, r);
 		}
-
 	}
-
+	
+	public static synchronized void setTime(String region, long time) {
+		if (maxtime.containsKey(region)) {
+			maxtime.put(region, time);
+		}
+	}
+	
+	public static synchronized void resetRegion(String route) {
+		String name = blockedroutes.get(route);
+		removePlayingPlayer(route, name);
+		highscores.get(route).reset();
+	}
+	
 	public static synchronized String[] getRegions(String world) {
 		ArrayList<Region> reg = regions.get(world);
 		if (reg == null || reg.size() == 0) {
@@ -116,83 +134,23 @@ public class RegionManager {
 		}
 		return ct.output();
 	}
-
-	public static synchronized String[] getHighscore(String region) {
+	
+	/* Highscore API */
+	
+	public static synchronized boolean deleteHighscoreScore(String region, int i) {
 		if (highscores.containsKey(region)) {
-			ChatTable ct = new ChatTable(
-					highscores.get(region).getScores().length + 1, 3);
-			ct.setHeader(Language.getRaw("highscore.header"));
-			for (String[] s : highscores.get(region).getScores()) {
-				String score = s[Highscore.type_score];
-				long scorelong = Long.valueOf(score);
-				ct.add(s[Highscore.type_name] + "-"
-						+ TimeUtilis.getFormattedMinutes(scorelong, 1000));
-			}
-			return ct.output();
-		} else {
-			return Language.get("route.noroute");
+			highscores.get(region).deleteScore(i);
 		}
-
+		return false;
 	}
-
-	public static synchronized int addStats(String region, String name,
-			long amount) {
+	
+	public static synchronized int addStats(String region, String name,long amount) {
 		if (highscores.containsKey(region)) {
 			return highscores.get(region).newScore(name, amount);
 		}
 		return 0;
 	}
-
-	public static synchronized boolean isBlocked(String region) {
-		if (blockedroutes.containsKey(region)) {
-			return !blockedroutes.get(region).equals("");
-		}
-		return false;
-	}
-
-	public static synchronized long getMaxTime(String region) {
-		if (maxtime.containsKey(region)) {
-			return maxtime.get(region);
-		}
-		return 0;
-	}
-
-	public static synchronized void setTime(String region, long time) {
-		if (maxtime.containsKey(region)) {
-			maxtime.put(region, time);
-		}
-	}
-
-	public static synchronized void addPlayingPlayer(String region, String name) {
-		if (blockedroutes.containsKey(region)) {
-			blockedroutes.put(region, name);
-			PlayerManager.addPlayingPlayer(name, region);
-		}
-	}
-
-	public static synchronized void resetRoute(String route) {
-		String name = blockedroutes.get(route);
-		removePlayingPlayer(route, name);
-		highscores.get(route).reset();
-	}
-
-	public static synchronized void removePlayingPlayer(String name) {
-		String route = PlayerManager.getPlayerRoute(name);
-		removePlayingPlayer(route, name);
-	}
-
-	protected static synchronized void removePlayingPlayer(String route,
-			String name) {
-		blockedroutes.put(route, "");
-		PlayerManager.removePlayingPlayer(name);
-		ShedulerFactory.unregister(name);
-	}
-
-	public static synchronized boolean isProtected(Block b) {
-		return areaCheck(b.getWorld().getName(), b.getX(), b.getY(), b.getZ(),
-				null);
-	}
-
+	
 	public static synchronized void newRecord(Player p, String region, long time) {
 		SpacerReplace sr = new SpacerReplace();
 		sr.addSpacer("%playername%", p.getName());
@@ -225,51 +183,161 @@ public class RegionManager {
 		case -1:
 			return;
 		}
-	}
-
-	public static synchronized boolean disableRegion(String region) {
-		return setRegion(region, true);
-	}
-
-	public static synchronized boolean enableRegion(String region) {
-		return setRegion(region, false);
-	}
-
-	private static synchronized boolean setRegion(String region, boolean b) {
-		if (disabledroutes.containsKey(region)) {
-			disabledroutes.put(region, b);
-			return true;
-		}
-		return false;
-	}
-
-	public static synchronized boolean deleteHighscoreScore(String region, int i) {
+	} 
+	
+	public static synchronized String[] getHighscore(String region) {
 		if (highscores.containsKey(region)) {
-			highscores.get(region).deleteScore(i);
+			ChatTable ct = new ChatTable(
+					highscores.get(region).getScores().length + 1, 3);
+			ct.setHeader(Language.getRaw("highscore.header"));
+			for (String[] s : highscores.get(region).getScores()) {
+				String score = s[Highscore.type_score];
+				long scorelong = Long.valueOf(score);
+				ct.add(s[Highscore.type_name] + "-"
+						+ TimeUtilis.getFormattedMinutes(scorelong, 1000));
+			}
+			return ct.output();
+		} else {
+			return Language.get("route.noroute");
 		}
-		return false;
+
 	}
 	
-	private static synchronized void addRegion(String name,Region r,Long time,boolean disabled,Region end){
-		r.setName(name);
-		end.setName(name);
-		endzone.put(name, end);
-		highscores.put(name, new Highscore(Config.getInt("highscores.max")));
-		maxtime.put(name, time);
-		blockedroutes.put(name, "");
-		disabledroutes.put(name, disabled);
-		String w = r.getWorld();
-		if (regions.containsKey(w)) {
-			regions.get(w).add(r);
-
-		} else {
-			ArrayList<Region> list = new ArrayList<Region>();
-			list.add(r);
-			regions.put(w, list);
+	/* Region Player API */
+	
+	public static synchronized void addPlayingPlayer(String region, String name) {
+		if (blockedroutes.containsKey(region)) {
+			blockedroutes.put(region, name);
+			PlayerManager.addPlayingPlayer(name, region);
 		}
 	}
+
+	public static synchronized void removePlayingPlayer(String name) {
+		String route = PlayerManager.getPlayerRoute(name);
+		removePlayingPlayer(route, name);
+	}
+
+	/* Block API */
+	
+	public static synchronized boolean isProtected(Block b) {
+		return areaCheck(b.getWorld().getName(), b.getX(), b.getY(), b.getZ(),null);
+	}
+
+	public static synchronized boolean areaCheck(String worldname, double x, double y, double z, ResponseRegion r) {
+		if (regions.size() == 0) {
+			return false;
+		}
+		for (Region region : regions.get(worldname)) {
+			if (!disabledroutes.get(region.getName())) {
+				if (region.playerIsInStartRegion(x, y, z)) {
+					if (r != null) {
+						r.setResponse(endzone.get(region.getName()));
+					}
+					return true;
+				}
+			}
+		}
+		return false;
+	}
+		
+	/* API Methods to Save and Load */
 	
 	public static synchronized void save() throws IOException{
+		if(!Config.getBoolean("use-mysql")){
+			saveFlatFile();
+		}else{
+			saveMySQL();
+		}
+	}
+	
+	static synchronized void saveHighscore(String name) throws IOException{
+		if(!Config.getBoolean("use-mysql")){
+			saveFlatFileHighscore(name);
+		}else{
+			saveMySQLHighscore(name);
+		}
+	}
+	
+	static synchronized void loadHighscore(String name) throws IOException{
+		if(!Config.getBoolean("use-mysql")){
+			loadFlatFileHighscore(name);
+		}else{
+			loadMySQLHighscore(name);
+		}
+	}
+	
+	static synchronized void load() throws NumberFormatException, IOException{
+		if(!Config.getBoolean("use-mysql")){
+			loadFlatFile();
+		}else{
+			loadMySQL();
+		}
+	}
+	
+	/* Internal Save and loading Methods */
+	
+	private static synchronized void saveMySQL() throws IOException{
+		FileWriter fstream = new FileWriter(regionFile);
+		BufferedWriter out = new BufferedWriter(fstream);
+		out.write("#Region Files " + System.currentTimeMillis() + "\n");
+		StringBuilder sb = new StringBuilder();
+		/**
+		 * INSERT INTO `defrag`.`def_routes` (
+		 *	`regionid` ,
+		 *	`regionname` ,
+		 *	`filestring` ,
+		 *	`maxtime` ,
+		 *	`disabled` ,
+		 *	`world` ,
+		 *	`endzone` 
+		 */
+		for (String world : regions.keySet()) {
+			for(Region region:regions.get(world)){
+				sb.append(region.getName() + ":");
+				sb.append(region.getFileString() + ":");
+				sb.append(maxtime.get(region.getName()) + ":");
+				sb.append(disabledroutes.get(region.getName()) + ":");
+				sb.append(region.getWorld() + ":");
+				sb.append(endzone.get(region.getName()).getFileString());
+				sb.append(";\n");
+				saveMySQLHighscore(region.getName());
+			}
+		}
+		out.write(sb.toString());
+		out.close();
+	}
+	
+	private static synchronized void loadMySQL(){
+		
+	}
+	
+	private static synchronized void loadFlatFile() throws NumberFormatException, IOException{
+		//test-0+1+2+3+4+5-4000-true-worldname
+		FileReader fr = new FileReader(regionFile);
+		BufferedReader reader = new BufferedReader(fr);
+		String line;
+		while ((line = reader.readLine()) != null) {
+			if (!line.startsWith("#")) {
+				String[] regions = line.split(";");
+				for (String region : regions) {
+					String args[] = region.split(":");
+					if (args.length >= 6) {
+						String name = args[0];
+						Region r = Region.parse(args[1].split("\\+"));
+						long time = Long.parseLong(args[2]);
+						boolean disabled = Boolean.parseBoolean(args[3]);
+						r.setWorld(args[4]);
+						Region end = Region.parse(args[5].split("\\+"));
+						addRegion(name,r,time,disabled,end);
+						loadFlatFileHighscore(name);
+					}
+				}
+			}
+		}
+		reader.close();
+	}
+	
+	private static synchronized void saveFlatFile() throws IOException{
 		FileWriter fstream = new FileWriter(regionFile);
 		BufferedWriter out = new BufferedWriter(fstream);
 		out.write("#Region Files " + System.currentTimeMillis() + "\n");
@@ -284,14 +352,22 @@ public class RegionManager {
 				sb.append(region.getWorld() + ":");
 				sb.append(endzone.get(region.getName()).getFileString());
 				sb.append(";\n");
-				saveHighscore(region.getName());
+				saveFlatFileHighscore(region.getName());
 			}
 		}
 		out.write(sb.toString());
 		out.close();
 	}
+
+	private static synchronized void saveMySQLHighscore(String region) {
+		
+	}
 	
-	private static synchronized void saveHighscore(String name) throws IOException{
+	private static synchronized void loadMySQLHighscore(String name) {
+
+	}
+	
+	private static synchronized void saveFlatFileHighscore(String name) throws IOException{
 		if(!highscores.containsKey(name)){
 			return;
 		}
@@ -318,7 +394,7 @@ public class RegionManager {
 		out.close();
 	}
 	
-	private static synchronized void loadHighscore(String name) throws IOException{
+	private static synchronized void loadFlatFileHighscore(String name) throws IOException{
 		if(!highscores.containsKey(name)){
 			return;
 		}
@@ -335,31 +411,41 @@ public class RegionManager {
 		highscores.put(name, highscore);
 		reader.close();
 	}
+
+	/* Internal Region Methods */
 	
-	
-	//test-0+1+2+3+4+5-4000-true-worldname
-	private static synchronized void load() throws NumberFormatException, IOException{
-		FileReader fr = new FileReader(regionFile);
-		BufferedReader reader = new BufferedReader(fr);
-		String line;
-		while ((line = reader.readLine()) != null) {
-			if (!line.startsWith("#")) {
-				String[] regions = line.split(";");
-				for (String region : regions) {
-					String args[] = region.split(":");
-					if (args.length >= 6) {
-						String name = args[0];
-						Region r = Region.parse(args[1].split("\\+"));
-						long time = Long.parseLong(args[2]);
-						boolean disabled = Boolean.parseBoolean(args[3]);
-						r.setWorld(args[4]);
-						Region end = Region.parse(args[5].split("\\+"));
-						addRegion(name,r,time,disabled,end);
-						loadHighscore(name);
-					}
-				}
-			}
+	private static synchronized boolean setRegion(String region, boolean b) {
+		if (disabledroutes.containsKey(region)) {
+			disabledroutes.put(region, b);
+			return true;
 		}
-		reader.close();
+		return false;
+	}
+	
+	private static synchronized void addRegion(String name,Region r,Long time,boolean disabled,Region end){
+		r.setName(name);
+		end.setName(name);
+		endzone.put(name, end);
+		highscores.put(name, new Highscore(Config.getInt("highscores.max")));
+		maxtime.put(name, time);
+		blockedroutes.put(name, "");
+		disabledroutes.put(name, disabled);
+		String w = r.getWorld();
+		if (regions.containsKey(w)) {
+			regions.get(w).add(r);
+
+		} else {
+			ArrayList<Region> list = new ArrayList<Region>();
+			list.add(r);
+			regions.put(w, list);
+		}
+	}
+
+	/* Internal Region Player*/
+	
+	private static synchronized void removePlayingPlayer(String route, String name) {
+		blockedroutes.put(route, "");
+		PlayerManager.removePlayingPlayer(name);
+		ShedulerFactory.unregister(name);
 	}
 }
