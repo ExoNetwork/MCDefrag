@@ -1,5 +1,7 @@
 package de.javakara.manf.mcdefrag.api;
 
+import java.sql.SQLException;
+
 import org.bukkit.Location;
 import org.bukkit.entity.Player;
 
@@ -80,7 +82,11 @@ public class PlayerObserver implements Runnable{
 				if(p.hasPermission("defrag.user.competitor")){
 					int rank = RegionManager.addStats(end.getName(),p.getName(),time);
 					if(rank == 1){
-						RegionManager.newRecord(p,end.getName(), time);
+						try {
+							RegionManager.newRecord(p,end.getName(), time);
+						} catch (SQLException e) {
+							e.printStackTrace();
+						}
 					}
 				}else{
 					p.sendMessage(Language.get("player.nosave"));

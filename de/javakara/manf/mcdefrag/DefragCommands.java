@@ -1,6 +1,7 @@
 package de.javakara.manf.mcdefrag;
 
 import java.io.IOException;
+import java.sql.SQLException;
 
 import org.bukkit.Bukkit;
 import org.bukkit.command.Command;
@@ -70,6 +71,8 @@ public class DefragCommands implements CommandExecutor {
 					try {
 						RegionManager.save();
 					} catch (IOException e) {
+						e.printStackTrace();
+					} catch (SQLException e) {
 						e.printStackTrace();
 					}
 					SpacerReplace sr = new SpacerReplace();

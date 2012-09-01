@@ -3,6 +3,7 @@ package de.javakara.manf.mcdefrag;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.sql.SQLException;
 
 import org.bukkit.plugin.java.JavaPlugin;
 
@@ -29,12 +30,6 @@ public class MCDefrag extends JavaPlugin{
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
-		Language.init(getJarLang(this));
-		ShedulerFactory.initialize(this);
-		RegionManager.initialise(getDataFolder());
-		ChatTable.initColors(Config.getString("default-color"), Config.getStringList("table.colors"));
-		PlayerListener.addWorld(Config.getStringList("worlds"));
-		registerCommands();
 		if(Config.getBoolean("use-mysql")){
 			MySQL.initialize(Config.getString("mysql.host"),
 							 Config.getInt("mysql.port") + "",
@@ -42,6 +37,19 @@ public class MCDefrag extends JavaPlugin{
 							 Config.getString("mysql.user"),
 							 Config.getString("mysql.password"));
 		}
+		Language.init(getJarLang(this));
+		ShedulerFactory.initialize(this);
+		try {
+			RegionManager.initialise(getDataFolder());
+		} catch (NumberFormatException e1) {
+			e1.printStackTrace();
+		} catch (SQLException e1) {
+			e1.printStackTrace();
+		}
+		ChatTable.initColors(Config.getString("default-color"), Config.getStringList("table.colors"));
+		PlayerListener.addWorld(Config.getStringList("worlds"));
+		registerCommands();
+	
 		
 		getServer().getPluginManager().registerEvents(new PlayerListener(), this);
 			
@@ -63,6 +71,8 @@ public class MCDefrag extends JavaPlugin{
 		try {
 			RegionManager.save();
 		} catch (IOException e) {
+			e.printStackTrace();
+		} catch (SQLException e) {
 			e.printStackTrace();
 		}
 	}

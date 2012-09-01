@@ -6,9 +6,11 @@ import java.io.File;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Hashtable;
+import java.util.Vector;
 
 import org.bukkit.Bukkit;
 import org.bukkit.block.Block;
@@ -17,6 +19,7 @@ import org.bukkit.entity.Player;
 import de.javakara.manf.mcdefrag.MCDefrag;
 import de.javakara.manf.mcdefrag.Config;
 import de.javakara.manf.mcdefrag.Language;
+import de.javakara.manf.mcdefrag.MySQL;
 import de.javakara.manf.mcdefrag.api.Region;
 import de.javakara.manf.mcdefrag.api.ResponseRegion;
 import de.javakara.manf.mcdefrag.api.Highscore;
@@ -47,7 +50,7 @@ public class RegionManager {
 		disabledroutes = new HashMap<String, Boolean>();
 	}
 
-	public static synchronized void initialise(File dataFolder){
+	public static synchronized void initialise(File dataFolder) throws NumberFormatException, SQLException{
 		regionFile = new File(dataFolder + File.separator + "regions.defragbase");
 		highscoreFolder = new File(dataFolder + File.separator + "scores");
 		try {
@@ -65,6 +68,8 @@ public class RegionManager {
 				try {
 					RegionManager.save();
 				} catch (IOException e) {
+					e.printStackTrace();
+				} catch (SQLException e) {
 					e.printStackTrace();
 				}
 			}
@@ -151,7 +156,7 @@ public class RegionManager {
 		return 0;
 	}
 	
-	public static synchronized void newRecord(Player p, String region, long time) {
+	public static synchronized void newRecord(Player p, String region, long time) throws SQLException {
 		SpacerReplace sr = new SpacerReplace();
 		sr.addSpacer("%playername%", p.getName());
 		sr.addSpacer("%route%", region);
@@ -242,7 +247,7 @@ public class RegionManager {
 		
 	/* API Methods to Save and Load */
 	
-	public static synchronized void save() throws IOException{
+	public static synchronized void save() throws IOException, SQLException{
 		if(!Config.getBoolean("use-mysql")){
 			saveFlatFile();
 		}else{
@@ -250,7 +255,7 @@ public class RegionManager {
 		}
 	}
 	
-	static synchronized void saveHighscore(String name) throws IOException{
+	static synchronized void saveHighscore(String name) throws IOException, SQLException{
 		if(!Config.getBoolean("use-mysql")){
 			saveFlatFileHighscore(name);
 		}else{
@@ -258,7 +263,7 @@ public class RegionManager {
 		}
 	}
 	
-	static synchronized void loadHighscore(String name) throws IOException{
+	static synchronized void loadHighscore(String name) throws IOException, SQLException{
 		if(!Config.getBoolean("use-mysql")){
 			loadFlatFileHighscore(name);
 		}else{
@@ -266,7 +271,7 @@ public class RegionManager {
 		}
 	}
 	
-	static synchronized void load() throws NumberFormatException, IOException{
+	static synchronized void load() throws NumberFormatException, IOException, SQLException{
 		if(!Config.getBoolean("use-mysql")){
 			loadFlatFile();
 		}else{
@@ -276,39 +281,36 @@ public class RegionManager {
 	
 	/* Internal Save and loading Methods */
 	
-	private static synchronized void saveMySQL() throws IOException{
-		FileWriter fstream = new FileWriter(regionFile);
-		BufferedWriter out = new BufferedWriter(fstream);
-		out.write("#Region Files " + System.currentTimeMillis() + "\n");
-		StringBuilder sb = new StringBuilder();
-		/**
-		 * INSERT INTO `defrag`.`def_routes` (
-		 *	`regionid` ,
-		 *	`regionname` ,
-		 *	`filestring` ,
-		 *	`maxtime` ,
-		 *	`disabled` ,
-		 *	`world` ,
-		 *	`endzone` 
-		 */
+	private static synchronized void saveMySQL() throws IOException, SQLException{
 		for (String world : regions.keySet()) {
 			for(Region region:regions.get(world)){
-				sb.append(region.getName() + ":");
-				sb.append(region.getFileString() + ":");
-				sb.append(maxtime.get(region.getName()) + ":");
-				sb.append(disabledroutes.get(region.getName()) + ":");
-				sb.append(region.getWorld() + ":");
-				sb.append(endzone.get(region.getName()).getFileString());
-				sb.append(";\n");
+				MySQL m = new MySQL();
+				m.setTable("def_routes");
+				m.setFlags(disabledroutes.get(region.getName()),
+						   maxtime.get(region.getName()),
+						   endzone.get(region.getName()));
+				m.setRegion(region);
+				m.saveInformation();
 				saveMySQLHighscore(region.getName());
 			}
 		}
-		out.write(sb.toString());
-		out.close();
 	}
 	
-	private static synchronized void loadMySQL(){
-		
+	private static synchronized void loadMySQL() throws SQLException{
+		System.out.println("ASDF");
+		MySQL m = new MySQL();
+		m.setTable("def_routes");
+		Vector<HashMap<String,String>> db = m.load();
+		for(HashMap<String, String> info:db){
+			String name = info.get("regionname");
+			Region r = Region.parse(info.get("filestring").split("\\+"));
+			long time = Long.parseLong(info.get("maxtime"));
+			boolean disabled = Boolean.parseBoolean(info.get("disabled"));
+			r.setWorld(info.get("world"));
+			Region end = Region.parse(info.get("endzone").split("\\+"));
+			addRegion(name,r,time,disabled,end);
+			loadMySQLHighscore(name);
+		}
 	}
 	
 	private static synchronized void loadFlatFile() throws NumberFormatException, IOException{
@@ -359,12 +361,21 @@ public class RegionManager {
 		out.close();
 	}
 
-	private static synchronized void saveMySQLHighscore(String region) {
-		
+	private static synchronized void saveMySQLHighscore(String region) throws SQLException {
+		MySQL m = new MySQL();
+		m.setTable("def_routes");
+		m.saveHighscore("def_scores", region, highscores.get(region));
 	}
 	
-	private static synchronized void loadMySQLHighscore(String name) {
-
+	private static synchronized void loadMySQLHighscore(String name) throws SQLException {
+		MySQL m = new MySQL();
+		m.setTable("def_routes");
+		HashMap<String,Long> scores = m.loadHighscore("def_scores",name);
+		Highscore highscore = new Highscore(Config.getInt("highscores.max"));
+		for(String player:scores.keySet()){
+			highscore.newScore(player, scores.get(player));
+		}
+		highscores.put(name, highscore);
 	}
 	
 	private static synchronized void saveFlatFileHighscore(String name) throws IOException{
@@ -395,9 +406,6 @@ public class RegionManager {
 	}
 	
 	private static synchronized void loadFlatFileHighscore(String name) throws IOException{
-		if(!highscores.containsKey(name)){
-			return;
-		}
 		FileReader fr = new FileReader(highscoreFolder + File.separator + name);
 		BufferedReader reader = new BufferedReader(fr);
 		String line;
